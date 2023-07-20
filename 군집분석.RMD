@@ -1,0 +1,141 @@
+---
+title: "장애인 편의 생활체육시설 후보지 선정"
+---
+
+
+```{r}
+library(tidyr)
+library(dplyr)
+library(readr)
+library(ggplot2)
+library(factoextra)
+```
+
+1. 데이터 정제 단계를 거친 후 새로 생성한 데이터셋 불러오기
+```{r}
+data <- read.csv("C:\\R Program\\OneDrive_2021-08-03\\제주지도.csv")
+
+# 필요한 변수 추출
+data_mat <- data %>% 
+  select(DIS_POP, CHONG_CNT, GEOJU_CNT, JAEHWAL_C, BOKJI_CNT) %>% 
+  as.matrix()
+```
+
+2. 변수 값 정규화(MinMax 정규화 방법 사용)
+```{r}
+MMN <- function(x){
+  mmn <- 
+    (x-min(x))/(max(x)-min(x))
+  return(mmn)
+}
+
+data_mmn <- 
+  apply(data_mat, 2, MMN) %>%
+  round(digits = 3) %>%
+  as.data.frame()
+
+summary(data_mmn)
+```
+
+
+2. 정규화된 데이터를 이용해 K-means 알고리즘에 사용할 최적 군집 개수 k 구하기
+```{r}
+WssPlot <- 
+  function(data, nc=20, seed=1234){
+  wss <- (nrow(data)-1)*sum(apply(data,2,var))
+  for (i in 2:nc){
+    set.seed(seed)
+    wss[i] <- sum(kmeans(data, centers=i)$withinss)}
+  plot(1:nc, wss, type="b", xlab="Number of Clusters",
+       ylab = "군집 내 거리제곱합")}
+
+WssPlot(data_mmn) # k = 5
+# elbow method : 말 그대로 팔꿈치 모습을 나타내는 곳의 값이 k값
+```
+
+
+3. K-means 알고리즘 실행
+```{r}
+clust_result_2 <- 
+  eclust(data_mmn, 
+         seed = 1234, 
+         "kmeans", 
+         k = 5)
+
+table(clust_result_2$cluster)
+```
+
+
+4. 원래 데이터 set에 할당된 Cluster 변수 추가
+#클러스터 할당
+```{r}
+data_mmn$cluster <- clust_result_2$cluster
+```
+
+#이름 붙여주기
+```{r}
+name = data$EMD_NM
+data_mmn <- cbind.data.frame(name,data_mmn)
+```
+
+
+5. Cluster 별로 능력치 Bar graph 
+#summary
+```{r}
+data_summary_2 <-
+  data_mmn %>%
+  group_by(cluster) %>%
+  summarise(name = n(),
+            장애인인구수 = mean(DIS_POP),
+            충전소 = mean(CHONG_CNT),
+            거주시설 = mean(GEOJU_CNT),
+            재활시설 = mean(JAEHWAL_C),
+            복지시설 = mean(BOKJI_CNT))
+```
+
+#Bar graph
+```{r}
+data_long <- gather(data_summary_2,
+                    장애인인구수,충전소,거주시설,재활시설,복지시설,
+                    key = "var",
+                    value = "value")
+
+data_long$cluster <- data_long$cluster %>% as.factor()
+str(data_long)
+
+ggplot(data_long, aes(x = var, y = value)) +
+  geom_bar(position = "dodge", stat = "identity") +
+  facet_wrap(~cluster, scale = "free")
+
+
+```
+
+6. 각 군집에 속해있는 읍면동 확인(최종 후보지 선정)
+  - 3번 군집이 모든 변수의 평균값이 평균보다 전체적으로 높아 3번 군집을 선택함
+```{r}
+jeju_1 <- filter(data_mmn, cluster == 1)
+jeju_1$name
+jeju_2 <- filter(data_mmn, cluster == 2)
+jeju_2$name
+jeju_3 <- filter(data_mmn, cluster == 3)
+jeju_3$name
+jeju_4 <- filter(data_mmn, cluster == 4)
+jeju_4$name
+jeju_5 <- filter(data_mmn, cluster == 5)
+jeju_5$name
+
+names(jeju_3)[1] <- '읍면동'
+names(jeju_3)[2] <- '장애인구'
+names(jeju_3)[3] <- '충전소'
+names(jeju_3)[4] <- '거주시설'
+names(jeju_3)[5] <- '재활시설'
+names(jeju_3)[6] <- '복지시설'
+names(jeju_3)[7] <- '군집'
+
+```
+
+```{r}
+install.packages('Deducer')
+library(Deducer)
+rocplot(clust_result_2)
+```

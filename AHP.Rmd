@@ -1,0 +1,179 @@
+###### K-means 알고리즘을 이용한 군집 내 대안들의 우선순위를 산출하는 AHP 분석 ########
+
+#### AHPhybrid 패키지를 사용할 것
+#### AHPhybrid 패키지의 AHPhybrid() 함수를 사용하기 위한 인자 정의
+
+```{r}
+library(AHPhybrid)
+```
+
+1. 분석명
+```{r}
+title <- "장애인 편의생활체육시설 입지선정"
+```
+
+
+2. 대안명(군집분석으로 선정된 체육시설명 설정)
+```{R}
+Alternatives <- c('제주공천포전지훈련센터', "남원종합경기장", '남원위미전천후게이트볼장','조천운동장,조천체육관','조천게이트볼장','애월근린공원애월체육관',
+                  '애월국민체육센터','상가리전천후게이트볼장','한림종합운동장','제주시 한라정' )
+
+### 평가기준 정의
+## 1) 정성적 평가기준
+# 쾌적성 : 체육시설 내 환경, 시설이 관리된 정도
+# 프로그램다양성 : 체육시설 내 가능한 운동 종목 수 및 생활체육프로그램의 질과 다양성
+Qualitative_criteria <- c("쾌적성", '프로그램 다양성')
+
+## 2) 정량적 평가기준
+# 접근성 : 생활체육시설과 가장 가까운 버스정류장과의 거리
+# 수용성 : 생활체육시설에 수용가능한 인원 및 체육시설 면적
+Quantitative_criteria <- c("접근성", "수용성")
+
+### 각 정량적 기준에 대한 목표정의
+Quantitative_crit_min_max <- c("min", "max") # 접근성은 낮고 수용성은 높다
+```
+
+
+3. AHPhybrid()함수 인자 입력
+```{r}
+## 대안 수
+n_alt <- length(Alternatives)
+
+## 평가기준 수
+n_crit <- (length(Qualitative_criteria)+length(Quantitative_criteria)) # 질적 변수 개수 + 양적 변수 개수
+n_crit_Qual <- length(Qualitative_criteria)                            # 질적 평가기준 개수
+n_crit_Quant <- length(Quantitative_criteria)                          # 양적 평가기준 개수
+```
+
+4. 평가기준 간 선호도를 측정하는 쌍대비교행렬 생성
+```{r}
+Criteria_Comparison <- matrix(c(1,1/4, 1/3, 1/2,
+                                4, 1, 2, 6,
+                                3, 1/2, 1, 4,
+                                2, 1/6, 1/4, 1),
+                              ncol = n_crit, nrow = n_crit, byrow = TRUE)
+```
+
+5. 질적 평가기준을 고려한 선호도를 측정하는 대안 간 쌍대비교행렬 생성
+```{r}
+## 질적 평가기준이 두 개(쾌적도, 다양성)이므로 총 두 개의 쌍대비교행렬 생성
+Qual_m_clean = matrix(c(1,3,5,2,6 ,2,2,6,1/2,7,    
+                        1/3,1,3, 1/2,4 ,1,1/4,3 , 1/2,5 ,   
+                        1/4,1/3,1,1/3,1,1/4,1/6,2,1/5,3,    
+                        1/2,2,3 ,1,4 ,2 ,1/3,4, 1/3,3,    
+                        1/5, 1/4,1,1/4,1, 1/4, 1/6,2 , 1/3,2,    
+                        1/2,1,4, 1/2,4,1, 1/2,4, 1/2,3,    
+                        1/2,4,6 ,3 ,6 ,2,1 ,5,1,4,    
+                        1/5,1/3,1/2, 1/4,1/2, 1/4,1/5,1, 1/5,1,    
+                        2,2,5 ,3,3 ,2,1,5,1,5 ,   
+                        1/5,1/5,1/3, 1/3,1/2, 1/3,1/4,1, 1/5,1),
+                   ncol = n_alt, nrow = n_alt, byrow = TRUE)
+Qual_m_differ = matrix(c(1,2 ,4,1,4 ,1, 1/2,4,1,7 ,   
+                         1/2,1 ,3 ,1 ,3 ,1 ,1/2,3 ,1 ,6,    
+                         1/4, 1/3,1, 1/3,1 , 1/3, 1/4,1, 1/3,2,    
+                         1 ,1,3 ,1,3 ,1 , 1/2,3 ,1 ,4,    
+                         1/4,1/3,1, 1/3,1,1/3, 1/3,1,1/3,2 ,   
+                         1,1,3 ,1 ,3 ,1, 1/2,3 ,1,4 ,   
+                         2 ,2,4 ,2 ,3 ,2 ,1 ,4,2,7 ,   
+                         1/4, 1/3,1, 1/3,1 , 1/3, 1/4,1, 1/3,2,    
+                         1,1 ,3,1,3 ,1, 1/2,3 ,1,4,    
+                         1/7, 1/6, 1/2, 1/4, 1/2, 1/4,1/7, 1/2, 1/4,1),
+                  ncol = n_alt, nrow = n_alt, byrow = TRUE)
+```
+
+
+6. 쌍대비교행렬의 가중치 산출
+```{r}
+## 1) 정규화 행렬 생성
+# 각 행렬을 정규화함
+nm = t(t(Criteria_Comparison)/colSums(Criteria_Comparison))
+nm 
+
+nm1 = t(t(Qual_m_clean)/colSums(Qual_m_clean))
+nm1               
+
+nm2 = t(t(Qual_m_differ)/colSums(Qual_m_differ))
+nm2
+
+### 2) 가중치 산출
+## apply() 함수를 이용하여 평균산출 후 세부항목별 가중치 계산
+## 부가적으로 rank()함수를 이용하여 가중치에 따른 세부항목별 순위도 산출 가능
+## 평균값 산출 (1:row, 2:col)
+ave = apply(nm, 1, mean)       # 중요도
+rank = rank(-ave)              # 순위
+nm_ave = cbind(nm, ave, rank)
+nm_ave                         # 정규행렬, 중요도, 순위
+
+ave1 = apply(nm1, 1, mean)       # 중요도
+rank1 = rank(-ave1)              # 순위
+nm_ave1 = cbind(nm1, ave1, rank1)
+nm_ave1                         # 정규행렬, 중요도, 순위
+
+ave2 = apply(nm2, 1, mean)       # 중요도
+rank2 = rank(-ave2)              # 순위
+nm_ave2 = cbind(nm2, ave2, rank2)
+nm_ave2                         # 정규행렬, 중요도, 순위
+
+```
+
+7. 일관성 평가
+```{r}
+## 생성한 쌍대비교행렬의 논리적 모순을 측정하기 위한 일관성 평가
+## 0.2 이하인 경우 논리적 모순이 없는 쌍대비교행렬
+## AHP 분석에서 일관성 비율은 CI값을 RI값으로 나누어 산출
+## CI는 max를 통하여 산출
+## RI 값들의 초기화
+vRI = c(0.00, 0.00, 0.58, 0.9, 1.12, 1.24, 1.32, 1.41, 1.46, 1.49)
+
+## max값 계산
+lambda_max = mean((Criteria_Comparison%*% ave)/ave)
+lambda_max1 = mean((Qual_m_clean%*% ave1)/ave1)
+lambda_max2 = mean((Qual_m_differ%*% ave2)/ave2)
+
+## 각 쌍대행렬의 CI, CR 산출
+CI = (lambda_max - n_crit)/(n_crit-1)
+CR = CI/vRI[n_crit]
+CR
+
+CI1 = (lambda_max1 - n_alt)/(n_alt-1)
+CR1 = CI1/vRI[n_alt]
+CR1
+
+CI2 = (lambda_max2 - n_alt)/(n_alt-1)
+CR2 = CI2/vRI[n_alt]
+CR2
+```
+
+8. AHPhybrid() 함수 사용하여 우선순위 산출
+```{r}
+## AHPhybrid()함수를 사용하기 위한 사전 준비 단계
+
+## 각 질적 기준의 대안들 사이의 선호 관계와 매트릭스를 비교하는 입력
+Alternatives_comparison_qualit_crit <- list(Qual_m_clean, Qual_m_differ)
+
+## 각 양적 기준에서 대안들의 정량적 성과 투입
+Alternatives_quantitative_crit <- matrix(c(56, 43266,                 # 각 접근성(버스정류장과의 거리), 수용성(체육시설 면적) 성과 입력
+                                           272, 11515,
+                                           470, 945,
+                                           81, 14749,
+                                           364, 600,
+                                           214, 7770,
+                                           205, 1240,
+                                           530, 600,
+                                           57, 4689,
+                                           1000, 4350),
+                                         nrow = n_alt, ncol = n_crit_Quant, byrow = TRUE)
+
+```
+
+
+9. 최종 우선순위 산출
+```{r}
+# - 기준 우선순위 계산
+# - 각 기준 및 글로벌 컨텍스트에서 대체 우선순위 계산
+# - 일관성 지수에 의한 선호도 입력의 유효한 추가
+# - 정량적, 정성적 데이터를 고려한 분석 제공
+AHPhybrid(title, Alternatives, Qualitative_criteria, Quantitative_criteria,
+          Quantitative_crit_min_max, n_alt, n_crit, n_crit_Qual, n_crit_Quant, Criteria_Comparison,
+          Alternatives_comparison_qualit_crit, Alternatives_quantitative_crit )
+```
